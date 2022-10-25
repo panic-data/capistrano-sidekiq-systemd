@@ -97,24 +97,24 @@ namespace :sidekiq do
       switch_user(role) do
         sidekiq_options_per_process.each_index do |index|
           systemctl(command: 'disable', service_unit_name: service_unit_name(index))
-          execute :rm, File.join(fetch(:service_unit_path, fetch_systemd_unit_path(capture(:pwd))), service_unit_name(index))
+          execute :rm,
+                  File.join(fetch(:service_unit_path, fetch_systemd_unit_path(capture(:pwd))), service_unit_name(index))
         end
       end
     end
   end
 
   def create_systemd_template(role)
-    template = File.read(File.expand_path('../../../../generators/capistrano/sidekiq/systemd/templates/sidekiq.service.capistrano.erb', __FILE__))
+    template = File.read(File.expand_path(
+                           '../../../generators/capistrano/sidekiq/systemd/templates/sidekiq.service.capistrano.erb', __dir__
+                         ))
     home_dir = capture :pwd
     systemd_path = fetch(:service_unit_path, fetch_systemd_unit_path(home_dir))
     sidekiq_cmd = SSHKit.config.command_map[:sidekiq].gsub('~', home_dir)
-    if fetch(:sidekiq_service_unit_user) == :user
-      execute :mkdir, "-p", systemd_path
-    end
+    execute :mkdir, '-p', systemd_path if fetch(:sidekiq_service_unit_user) == :user
     sidekiq_options_per_process.each_index do |index|
       upload_template(data: StringIO.new(ERB.new(template).result(binding)),
-        systemd_path: systemd_path, service_unit_name: service_unit_name(index)
-      )
+                      systemd_path: systemd_path, service_unit_name: service_unit_name(index))
     end
     systemctl(command: 'daemon-reload')
   end
@@ -122,7 +122,7 @@ namespace :sidekiq do
   def process_options(index = 0)
     args = []
     args.push "--environment #{fetch(:sidekiq_env)}"
-    %w{require queue config concurrency}.each do |option|
+    %w[require queue config concurrency].each do |option|
       options = fetch(:sidekiq_options_per_process)&.[](index)
       Array((options.is_a?(Hash) && options[option.to_sym]) || fetch(:"sidekiq_#{option}")).each do |value|
         args.push "--#{option} #{value}"
@@ -142,14 +142,12 @@ namespace :sidekiq do
     args.compact.join(' ')
   end
 
-  def switch_user(role)
+  def switch_user(role, &block)
     su_user = sidekiq_user(role)
     if su_user == role.user
       yield
     else
-      as su_user do
-        yield
-      end
+      as su_user, &block
     end
   end
 
@@ -165,13 +163,14 @@ namespace :sidekiq do
     fetch(:sidekiq_options_per_process) || [nil]
   end
 
-  def service_unit_name(index)
-    if multiple_processes?
-      options = fetch(:sidekiq_options_per_process)&.[](index)
-      (options.is_a?(Hash) && options[:service_unit_name]) || fetch(:service_unit_name).gsub(/(.*)\.service/, "\\1-#{index}.service")
-    else
-      fetch(:service_unit_name)
-    end
+  def service_unit_name(_index)
+    # if multiple_processes?
+    #   options = fetch(:sidekiq_options_per_process)&.[](index)
+    #   (options.is_a?(Hash) && options[:service_unit_name]) || fetch(:service_unit_name).gsub(/(.*)\.service/,
+    #                                                                                          "\\1-#{index}.teste.service")
+    # else
+    fetch(:service_unit_name)
+    # end
   end
 
   def max_mem(index, service = :systemd)
@@ -192,7 +191,7 @@ namespace :sidekiq do
 
   def systemctl(command:, service_unit_name: nil, raise_on_non_zero_exit: true)
     if fetch(:sidekiq_service_unit_user) == :user
-      execute :systemctl, "--user", command, service_unit_name, raise_on_non_zero_exit: raise_on_non_zero_exit
+      execute :systemctl, '--user', command, service_unit_name, raise_on_non_zero_exit: raise_on_non_zero_exit
     elsif fetch(:sidekiq_service_unit_user) == :system
       execute :sudo, :systemctl, command, service_unit_name, raise_on_non_zero_exit: raise_on_non_zero_exit
     end
@@ -200,9 +199,9 @@ namespace :sidekiq do
 
   def fetch_systemd_unit_path(home_dir)
     if fetch(:sidekiq_service_unit_user) == :user
-      File.join(home_dir, ".config", "systemd", "user")
+      File.join(home_dir, '.config', 'systemd', 'user')
     elsif fetch(:sidekiq_service_unit_user) == :system
-      File.join("/", "etc", "systemd", "system")
+      File.join('/', 'etc', 'systemd', 'system')
     end
   end
 
