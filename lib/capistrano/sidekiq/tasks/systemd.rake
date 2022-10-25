@@ -163,14 +163,14 @@ namespace :sidekiq do
     fetch(:sidekiq_options_per_process) || [nil]
   end
 
-  def service_unit_name(_index)
-    # if multiple_processes?
-    #   options = fetch(:sidekiq_options_per_process)&.[](index)
-    #   (options.is_a?(Hash) && options[:service_unit_name]) || fetch(:service_unit_name).gsub(/(.*)\.service/,
-    #                                                                                          "\\1-#{index}.teste.service")
-    # else
-    fetch(:service_unit_name)
-    # end
+  def service_unit_name(index)
+    if multiple_processes?
+      options = fetch(:sidekiq_options_per_process)&.[](index)
+      (options.is_a?(Hash) && options[:service_unit_name]) || fetch(:service_unit_name).gsub(/(.*)\.service/,
+                                                                                             "\\1-#{index}.teste.service")
+    else
+      fetch(:service_unit_name)
+    end
   end
 
   def max_mem(index, service = :systemd)
