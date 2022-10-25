@@ -81,10 +81,14 @@ namespace :sidekiq do
 
   desc 'Generate and upload .service files'
   task :install do
+    puts 'Install Start'
+    puts "Roles #{fetch(:sidekiq_roles)}"
     on roles fetch(:sidekiq_roles) do |role|
+      puts "Loop Role #{role}"
       switch_user(role) do
         create_systemd_template(role)
         sidekiq_options_per_process.each_index do |index|
+          puts "Loop Index #{index}"
           systemctl(command: 'enable', service_unit_name: service_unit_name(index))
         end
       end
